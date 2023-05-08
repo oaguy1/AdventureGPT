@@ -11,6 +11,7 @@ import readline
 import sys
 import tiktoken
 import openai
+import pprint
 from time import sleep
 
 from adventure import load_advent_dat
@@ -23,48 +24,82 @@ INTRO = """
 
 You are playing the 1977 classic Colossal Cave. 
 
-IF YOU WANT TO END YOUR ADVENTURE EARLY, SAY "QUIT". TO SUSPEND YOUR
-ADVENTURE SUCH THAT YOU CAN CONTINUE LATER, SAY "SUSPEND" (OR "PAUSE"
-OR "SAVE").  TO SEE WHAT HOURS THE CAVE IS NORMALLY OPEN, SAY "HOURS".
-TO SEE HOW WELL YOU'RE DOING, SAY "SCORE".  TO GET FULL CREDIT FOR A
-TREASURE, YOU MUST HAVE LEFT IT SAFELY IN THE BUILDING, THOUGH YOU GET
-PARTIAL CREDIT JUST FOR LOCATING IT.  YOU LOSE POINTS FOR GETTING 
-KILLED, OR FOR QUITTING, THOUGH THE FORMER COSTS YOU MORE.  THERE ARE
-ALSO POINTS BASED ON HOW MUCH (IF ANY) OF THE CAVE YOU'VE MANAGED TO 
-EXPLORE; IN PARTICULAR, THERE IS A LARGE BONUS JUST FOR GETTING IN (TO                                                     
-DISTINGUISH THE BEGINNERS FROM THE REST OF THE PACK), AND THERE ARE
-OTHER WAYS TO DETERMINE WHETHER YOU'VE BEEN THROUGH SOME OF THE MORE
-HARROWING SECTIONS.  IF YOU THINK YOU'VE FOUND ALL THE TREASURES, JUST
-KEEP EXPLORING FOR A WHILE.  IF NOTHING INTERESTING HAPPENS, YOU      
-HAVEN'T FOUND THEM ALL YET.  IF SOMETHING INTERESTING *DOES* HAPPEN,
-IT MEANS YOU'RE GETTING A BONUS AND HAVE AN OPPORTUNITY TO GARNER MANY
-MORE POINTS IN THE MASTER'S SECTION.  I MAY OCCASIONALLY OFFER HINTS
-IF YOU SEEM TO BE HAVING TROUBLE.  IF I DO, I'LL WARN YOU IN ADVANCE
-HOW MUCH IT WILL AFFECT YOUR SCORE TO ACCEPT THE HINTS.  FINALLY, TO
-SAVE PAPER, YOU MAY SPECIFY "BRIEF", WHICH TELLS ME NEVER TO REPEAT   
-THE FULL DESCRIPTION OF A PLACE UNLESS YOU EXPLICITLY ASK ME TO.
-I KNOW OF PLACES, ACTIONS, AND THINGS.  MOST OF MY VOCABULARY
-DESCRIBES PLACES AND IS USED TO MOVE YOU THERE.  TO MOVE, TRY WORDS
-LIKE FOREST, BUILDING, DOWNSTREAM, ENTER, EAST, WEST, NORTH, SOUTH,
-UP, OR DOWN.  I KNOW ABOUT A FEW SPECIAL OBJECTS, LIKE A BLACK ROD
-HIDDEN IN THE CAVE.  THESE OBJECTS CAN BE MANIPULATED USING SOME OF
-THE ACTION WORDS THAT I KNOW. USUALLY YOU WILL NEED TO GIVE BOTH THE
-OBJECT AND ACTION WORDS (IN EITHER ORDER), BUT SOMETIMES I CAN INFER                                                       
-THE OBJECT FROM THE VERB ALONE.  SOME OBJECTS ALSO IMPLY VERBS; IN
-PARTICULAR, "INVENTORY" IMPLIES "TAKE INVENTORY", WHICH CAUSES ME TO
-GIVE YOU A LIST OF WHAT YOU'RE CARRYING.  THE OBJECTS HAVE SIDE
-EFFECTS; FOR INSTANCE, THE ROD SCARES THE BIRD.  USUALLY PEOPLE HAVING
-TROUBLE MOVING JUST NEED TO TRY A FEW MORE WORDS.  USUALLY PEOPLE
-TRYING UNSUCCESSFULLY TO MANIPULATE AN OBJECT ARE ATTEMPTING SOMETHING
-BEYOND THEIR (OR MY!) CAPABILITIES AND SHOULD TRY A COMPLETELY
-DIFFERENT TACK.  TO SPEED THE GAME YOU CAN SOMETIMES MOVE LONG
-DISTANCES WITH A SINGLE WORD. FOR EXAMPLE, "BUILDING" USUALLY GETS
-YOU TO THE BUILDING FROM ANYWHERE ABOVE GROUND EXCEPT WHEN LOST IN THE
-FOREST.  ALSO, NOTE THAT CAVE PASSAGES TURN A LOT, AND THAT LEAVING A
-ROOM TO THE NORTH DOES NOT GUARANTEE ENTERING THE NEXT FROM THE SOUTH.
-GOOD LUCK!
+If you ask the same question in a loop, use the "help" command to get out of the loop. Don't get frustrated and only take one item at a time.
 
-Answer the first questionwith "Y"
+
+The games text parser is limited, keep your commands to one action and 1-3 words. Enter a single command for each prompt.. Use the following guide to beat the game. Look around and e what is visible. if your objective is invisible, keep moving. You can only move north, south, east, and west.
+
+----------------------
+
+1. Enter building. Get keys and lamp.  The lamp appears here should you have to
+be reincarnated.
+2. Find gate and unlock gate (with key).  Get cage. Find cave, enter cave.
+3. Try the magic word, XYZZY.  Try it again.  Get rod.
+4. Drop rod. Get bird. Get rod.
+5. Wave rod. Drop rod. Go get diamonds and gold.
+6. Release bird. Drop cage. Grab coins and silver. Note: Dwarves are lousy
+shots, but sometimes, unfortunately, they can get lucky.  Carry the ax, as you
+may encounter up to five of these critters.
+7. Try the magic word PLUGH also. Drop silver, gold nugget, diamonds, jewelry,
+and coins. If you haven't already, you will soon encounter a thieving pirate.
+Not to worry, he's got to rob you at least once if you're to win all the
+marbles.
+8. Carrying food, ax, bottle of water, key (all for later) and lantern, visit
+the software den (Microsoft Version only). Don't mess with anything--Software
+types are a weird lot.  Get magic word LWPI.  Works only from here.
+9. Water plant twice. Get water for the second pass at the waterfall.
+10. Attack dragon. Yes. Get rug.
+11. Get oil (in now empty bottle). Climb the plant.
+12. Oil door. Open door. Drop bottle. While here and while carrying golden eggs,
+
+enter FEE, FIE, FOE, FOO, one word at a time. Check your inventory.  Go back to
+where you first found the eggs.
+13. Throw eggs (to troll).  Cross bridge before the FEE, FIE, whatever.
+14. Feed bear.  Unlock chain (with key).  Get golden chain. Drop key.  Get bear.
+
+Don't forget the rare spices.  At volcano view, read and remember the words of
+fire.
+15. Release bear.  Don't try crossing the bridge with him on the chain.
+16. Open oyster (with trident).  Pearl will roll down into the cul-de-sac.
+17. Insert coin to get a replacement battery for your lamp, if necessary.  Coins
+
+are a treasure, however, and you won't ge them back, so try beating the game
+with the original batteries only.
+18. Never drop vase unless you have already dropped the pillow.
+19. Drop everything in order to enter.  Get emerald.
+20. Say PLOVER.  Get pyramid.  PLOVER, PLUGH and pi-tooie!
+21. You must traverse the maze to get Pirate's Treasure Chest, which doesn't
+appear until he's robbed you.  Return via the Pit and XYZZY.  Drop all treasures
+
+in the House.
+22. Drop magazine in Witt's End for a point.  Get out by entering all different
+directions except north.  It may take a while.  Slog around in various and
+distant locations until a voice announces that the cave is now closed.  At this
+point you are teleported to the two-room Master's Game.
+23. Get black rod (with the rusty marks, not the star).  Drop rod in the
+northeast room.  Retreat to the southwest room. Type blast. Alternate endings
+are possible, but will not yield sufficient points to earn you the rank of
+adventure grandmaster.
+
+Treasure List
+What                                                            Where
+Golden Eggs                                             Giant Room
+Trident                                                 Magnificent Canyon
+Pearl                                                   Clam Room
+Pirate's Chest                                          Pirate's Maze
+Platinum Pyramid                                        Dark Room
+Emerald                                                 Plover Room
+Ming Vase (and Pillow)                                  Oriental Room
+Rare Spices                                             Chamber of Boulders
+Persian Rug                                             Dragon's Den
+Golden Chain                                            Bear's Chamber
+Diamonds                                                West Side of Fissure
+Jewelry                                                 South Side Chamber
+Gold Nugget                                             Gold Room
+Silver Bars                                             North-South Passage
+Coins                                                   West Side Chamber
+
+
 
 """
 
@@ -78,20 +113,15 @@ class Loop():
         ]
         self.loop(args)
 
-
-    def num_tokens_from_string(self, string: str, encoding_name: str) -> int:
-        """Returns the number of tokens in a text string."""
-        encoding = tiktoken.get_encoding(encoding_name)
-        num_tokens = len(encoding.encode(string))
-        return num_tokens
-
-
     def baudout(self, s: str):
         out = sys.stdout
         for c in s:
             sleep(9. / BAUD)  # 8 bits + 1 stop bit @ the given baud rate
             out.write(c)
             out.flush()
+
+    def dump_history(self):
+        pprint.pprint(self.history)
 
     def loop(self, args):
         parser = argparse.ArgumentParser(
@@ -101,7 +131,13 @@ class Loop():
             'savefile', nargs='?', help='The filename of game you have saved.')
         args = parser.parse_args(args)
 
-        openai.api_key = input("OpenAI Key:")
+        api_key = os.environ.get("OPENAI_API_KEY")
+        
+        if not api_key:
+            api_key = input("OpenAI Key:")
+            os.environ["OPENAI_API_KEY"] = api_key
+
+        openai.api_key = api_key
 
         if args.savefile is None:
             self.game = Game()
@@ -117,28 +153,30 @@ class Loop():
             self.baudout('GAME RESTORED\n')
 
         while not self.game.is_finished:
-            line = "" 
-            while not line:
+            lines = "" 
+            while not lines:
                 try:
                     response = openai.ChatCompletion.create(model=LLM, messages=self.history, temperature=0)
-                    line = response['choices'][0]['message']['content'].lower() 
+                    lines = response['choices'][0]['message']['content'].lower() 
                 except:
                     self.baudout("OpenAI is being cranky...\n")
                     sleep(10)
-                finally:
-                    self.history.append(response['choices'][0]['message'])
-
-            words = re.findall(r'\w+', line)
-            if words:
-                command_output = self.game.do_command(words)
-                self.history.append({
-                    "role": "system", "content": command_output
-                })
-                self.baudout(f"> {line}\n\n")
-                self.baudout(command_output)
+            
+            self.history.append(response['choices'][0]['message'])
+            for line in lines.split('.'):
+                words = re.findall(r'\w+', line)
+                if words:
+                    command_output = self.game.do_command(words)
+                    self.history.append({
+                        "role": "system", "content": command_output
+                    })
+                    self.baudout(f"> {line}\n\n")
+                    self.baudout(command_output)
 
 if __name__ == '__main__':
     try:
-        Loop(sys.argv[1:])
+        loop = Loop(sys.argv[1:])
     except EOFError:
         pass
+    except:
+        loop.dump_history()
