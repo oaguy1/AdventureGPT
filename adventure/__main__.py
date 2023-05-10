@@ -31,6 +31,8 @@ The games text parser is limited, keep your commands to one action and 1-3 words
 
 ----------------------
 
+FROM: https://lisashea.com/gaming/strategy_lib_adwalk.html
+
 Getting In to the Caves
 
 
