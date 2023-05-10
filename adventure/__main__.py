@@ -31,75 +31,31 @@ The games text parser is limited, keep your commands to one action and 1-3 words
 
 ----------------------
 
-1. Enter building. Get keys and lamp.  The lamp appears here should you have to
-be reincarnated.
-2. Find gate and unlock gate (with key).  Get cage. Find cave, enter cave.
-3. Try the magic word, XYZZY.  Try it again.  Get rod.
-4. Drop rod. Get bird. Get rod.
-5. Wave rod. Drop rod. Go get diamonds and gold.
-6. Release bird. Drop cage. Grab coins and silver. Note: Dwarves are lousy
-shots, but sometimes, unfortunately, they can get lucky.  Carry the ax, as you
-may encounter up to five of these critters.
-7. Try the magic word PLUGH also. Drop silver, gold nugget, diamonds, jewelry,
-and coins. If you haven't already, you will soon encounter a thieving pirate.
-Not to worry, he's got to rob you at least once if you're to win all the
-marbles.
-8. Carrying food, ax, bottle of water, key (all for later) and lantern, visit
-the software den (Microsoft Version only). Don't mess with anything--Software
-types are a weird lot.  Get magic word LWPI.  Works only from here.
-9. Water plant twice. Get water for the second pass at the waterfall.
-10. Attack dragon. Yes. Get rug.
-11. Get oil (in now empty bottle). Climb the plant.
-12. Oil door. Open door. Drop bottle. While here and while carrying golden eggs,
-
-enter FEE, FIE, FOE, FOO, one word at a time. Check your inventory.  Go back to
-where you first found the eggs.
-13. Throw eggs (to troll).  Cross bridge before the FEE, FIE, whatever.
-14. Feed bear.  Unlock chain (with key).  Get golden chain. Drop key.  Get bear.
-
-Don't forget the rare spices.  At volcano view, read and remember the words of
-fire.
-15. Release bear.  Don't try crossing the bridge with him on the chain.
-16. Open oyster (with trident).  Pearl will roll down into the cul-de-sac.
-17. Insert coin to get a replacement battery for your lamp, if necessary.  Coins
-
-are a treasure, however, and you won't ge them back, so try beating the game
-with the original batteries only.
-18. Never drop vase unless you have already dropped the pillow.
-19. Drop everything in order to enter.  Get emerald.
-20. Say PLOVER.  Get pyramid.  PLOVER, PLUGH and pi-tooie!
-21. You must traverse the maze to get Pirate's Treasure Chest, which doesn't
-appear until he's robbed you.  Return via the Pit and XYZZY.  Drop all treasures
-
-in the House.
-22. Drop magazine in Witt's End for a point.  Get out by entering all different
-directions except north.  It may take a while.  Slog around in various and
-distant locations until a voice announces that the cave is now closed.  At this
-point you are teleported to the two-room Master's Game.
-23. Get black rod (with the rusty marks, not the star).  Drop rod in the
-northeast room.  Retreat to the southwest room. Type blast. Alternate endings
-are possible, but will not yield sufficient points to earn you the rank of
-adventure grandmaster.
-
-Treasure List
-What                                                            Where
-Golden Eggs                                             Giant Room
-Trident                                                 Magnificent Canyon
-Pearl                                                   Clam Room
-Pirate's Chest                                          Pirate's Maze
-Platinum Pyramid                                        Dark Room
-Emerald                                                 Plover Room
-Ming Vase (and Pillow)                                  Oriental Room
-Rare Spices                                             Chamber of Boulders
-Persian Rug                                             Dragon's Den
-Golden Chain                                            Bear's Chamber
-Diamonds                                                West Side of Fissure
-Jewelry                                                 South Side Chamber
-Gold Nugget                                             Gold Room
-Silver Bars                                             North-South Passage
-Coins                                                   West Side Chamber
+Getting In to the Caves
 
 
+'Enter' building, and 'take' the keys and lamp. Now go 'out' of the building.
+Go down, down to the slit in the rock. Go South to the grate. Unlock grate with key, open grate. Go down.
+
+Go west, take the cage. Go west again, turn on the lamp. Grab the rod and say XYZZY. POOF you're back in the well house! Say XYZZY again to return to the Debris Room.
+
+Go west to the sloping room. Drop the rod. Go west to the Orange River Chamber. Grab the bird (it's afraid of the rod). Now go east and get the rod, and head back west again. Go down into the pit. You're in the caves!
+
+
+Level 1 - Snakes and Plughs
+
+
+Level 1 is pretty easy. You start at the Hall of Mists. Head south and grab the gold (+7 score, +9 to drop off). Head north. Hall of the Mountain King, with a snake. Open the cage so the bird drives away the snake. OK, passages in all directions. 
+
+To the west is a West Side Chamber with coins (+7 score, +5 drop off). Grab and go east again. To the south is the South Side Chamber with jewelry (+7 score, +5 drop off). Grab it and go north again. To the north is a chamber with a hole in it, with silver. Grab the silver (+7 score, +5 drop off). 
+
+Go north one more room, to the Y2 room. Say "plugh" to zap back to the Well House. Drop off your treasures. 
+
+Drop off the keys for now, then say "plugh" to return to Y2. 
+
+If you hit a dwarf in here anywhere, and he throws an axe, take it! Then when you see him again, "throw axe at dwarf" to get him. If you miss, just "take axe" and throw it again. 
+
+OK, now head to the Fissure, west of the Hall of Mists. Wave the Rod to make a crystal bridge appear. Cross it to grab the diamonds. Now head west and south to get into the Pirate Maze. You want to go EAST, SOUTH, then NORTH to get to the chest. When you take it, head SOUTHEAST, WEST and SOUTH to get down to the Orange Room. Just go east twice and then say XYZZY to pop back to the well house. 
 
 """
 
