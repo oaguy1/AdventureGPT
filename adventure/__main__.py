@@ -5,7 +5,9 @@ Copyright 2010-2015 Brandon Rhodes.  Licensed as free software under the
 Apache License, Version 2.0 as detailed in the accompanying README.txt.
 """
 import argparse
+import functools
 import os
+import operator
 import re
 import readline
 import sys
@@ -67,9 +69,14 @@ class Loop():
             )
 
             self.history = new_history
+           
+            # split lines by newlines and periods and flatten list
+            newline_split = lines.lower().split('\n')
+            period_split = [ line.split('.') for line in newline_split ]
+            split_lines = functools.reduce(operator.iconcat, period_split, []) 
             
             # We got input! Act on it.
-            for line in lines.lower().split('.'):
+            for line in split_lines:
                 words = re.findall(r'\w+', line)
                 if words:
                     command_output = self.game.do_command(words)
