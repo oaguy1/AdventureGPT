@@ -24,19 +24,18 @@ BAUD = 1200
 class Loop():
 
     def __init__(self):
+        print("***************** INITIALIZING GAME *******************")
         self.history = []
         self.game_tasks = agent.gametask_creation_agent()
         self.next_game_task()
 
-
     def next_game_task(self):
+        print("***************** TASK LIST *******************")
+        print(self.game_tasks)
+        print()
         next_task = self.game_tasks.popleft()
         if next_task:
             self.current_task = next_task["task_name"]
-
-        self.subtasks = agent.subtask_creation_agent(
-            self.current_task
-        )
 
 
     def baudout(self, s: str):
@@ -62,16 +61,12 @@ class Loop():
         })
 
         while not self.game.is_finished:
-            lines, new_history = agent.next_game_input(
-                self.history,
-                self.subtasks,
-                self.current_task
-            )
-
-            self.history = new_history
+            # Ask Player Agent what to do next
+            result = agent.player_agent(self.current_task, self.history)
+            self.history.append({"role": "assistant", "content": result})
            
             # split lines by newlines and periods and flatten list
-            newline_split = lines.lower().split('\n')
+            newline_split = result.lower().split('\n')
             period_split = [ line.split('.') for line in newline_split ]
             split_lines = functools.reduce(operator.iconcat, period_split, []) 
             
@@ -85,11 +80,11 @@ class Loop():
                     })
                     self.baudout(f"> {line}\n\n")
                     self.baudout(command_output)
-                    self.subtasks = agent.update_subtask_list(command_output, self.current_task, self.subtasks)
+                    completed = agent.task_completion_agent(self.current_task, self.history)
 
-            # No further action for this game task, onto the next
-            if not lines:
-                self.next_game_task()
+                    if completed:
+                        self.next_game_task()
+
 
 if __name__ == '__main__':
     try:

@@ -142,6 +142,12 @@ class SingleTaskListStorage:
     def get_task_names(self):
         return [t["task_name"] for t in self.tasks]
 
+    def __repr__(self):
+        self.tasks
+
+    def __str__(self):
+        return "\n".join([f'{i}. {t["task_name"]}' for i, t in enumerate(self.tasks)])
+
 
 def gametask_creation_agent(
         objective: str = OBJECTIVE, walkthrough: str = WALKTHROUGH
@@ -163,9 +169,7 @@ Unless your list is empty, do not include any headers before your numbered list 
 
 """
 
-    print(f'\n*****TASK CREATION AGENT PROMPT****\n{prompt}\n')
     response = openai_call(prompt_to_history(prompt), max_tokens=2000)
-    print(f'\n****TASK CREATION AGENT RESPONSE****\n{response}\n')
     new_tasks = response.split('\n')
     new_tasks_list = []
     for task_string in new_tasks:
@@ -175,97 +179,16 @@ Unless your list is empty, do not include any headers before your numbered list 
             task_name = re.sub(r'[^\w\s_]+', '', task_parts[1]).strip()
             if task_name.strip() and task_id.isnumeric():
                 new_tasks_list.append(task_name)
-            # print('New task created: ' + task_name)
 
     output = [{"task_name": task_name} for task_name in new_tasks_list]
 
     tasks_storage = SingleTaskListStorage(output)
 
     return tasks_storage
-
-
-def subtask_creation_agent(
-        objective: str, result: str = "", task_description: str = "", task_list: List[str] = []
-):
-    prompt = f"""
-You are to use the result from an execution agent to create new tasks with the following objective: {objective}.
-The last completed task has the result: \n{result}
-"""
-    if task_description:
-        prompt += "This result was based on this task description: {task_description}.\n"""
-
-    if task_list:
-        prompt += f"These are incomplete tasks: {', '.join(task_list)}\n"
-    prompt += "Based on the result, return a list of tasks to be completed in order to meet the objective. "
-    if task_list:
-        prompt += "These new tasks must not overlap with incomplete tasks. "
-
-    prompt += """
-Return one task per line in your response. The result must be a numbered list in the format:
-
-#. First task
-#. Second task
-
-The number of each entry must be followed by a period. If your list is empty, write "There are no tasks to add at this time."
-Unless your list is empty, do not include any headers before your numbered list or follow your numbered list with any other output."""
-
-    print(f'\n*****TASK CREATION AGENT PROMPT****\n{prompt}\n')
-    response = openai_call(prompt_to_history(prompt), max_tokens=2000)
-    print(f'\n****TASK CREATION AGENT RESPONSE****\n{response}\n')
-    new_tasks = response.split('\n')
-    new_tasks_list = []
-    for task_string in new_tasks:
-        task_parts = task_string.strip().split(".", 1)
-        if len(task_parts) == 2:
-            task_id = ''.join(s for s in task_parts[0] if s.isnumeric())
-            task_name = re.sub(r'[^\w\s_]+', '', task_parts[1]).strip()
-            if task_name.strip() and task_id.isnumeric():
-                new_tasks_list.append(task_name)
-            # print('New task created: ' + task_name)
-
-    output = [{"task_name": task_name} for task_name in new_tasks_list]
-    tasks_storage = SingleTaskListStorage(output)
-
-    return tasks_storage
-
-
-def prioritization_agent(tasks_storage, current_game_task):
-    task_names = tasks_storage.get_task_names()
-    bullet_string = '\n'
-
-    prompt = f"""
-You are tasked with prioritizing the following tasks: {bullet_string + bullet_string.join(task_names)}
-Consider the ultimate objective of your team: {current_game_task}.
-Tasks should be sorted from highest to lowest priority, where higher-priority tasks are those that act as pre-requisites or are more essential for meeting the objective.
-Do not remove any tasks. Return the ranked tasks as a numbered list in the format:
-
-#. First task
-#. Second task
-
-The entries must be consecutively numbered, starting with 1. The number of each entry must be followed by a period.
-Do not include any headers before your ranked list or follow your list with any other output."""
-
-    print(f'\n****TASK PRIORITIZATION AGENT PROMPT****\n{prompt}\n')
-    response = openai_call(prompt_to_history(prompt), max_tokens=2000)
-    print(f'\n****TASK PRIORITIZATION AGENT RESPONSE****\n{response}\n')
-    if not response:
-        print('Received empty response from priotritization agent. Keeping task list unchanged.')
-        return
-    new_tasks = response.split("\n") if "\n" in response else [response]
-    new_tasks_list = []
-    for task_string in new_tasks:
-        task_parts = task_string.strip().split(".", 1)
-        if len(task_parts) == 2:
-            task_id = ''.join(s for s in task_parts[0] if s.isnumeric())
-            task_name = re.sub(r'[^\w\s_]+', '', task_parts[1]).strip()
-            if task_name.strip():
-                new_tasks_list.append({"task_id": task_id, "task_name": task_name})
-
-    return SingleTaskListStorage(new_tasks_list)
 
 
 # Execute a task based on the objective and five previous tasks
-def player_agent(objective: str, task: str, history: List[Dict[str, str]]) -> str:
+def player_agent(objective: str, history: List[Dict[str, str]]) -> str:
     """
     Executes a task based on the given objective and previous context.
 
@@ -278,9 +201,6 @@ def player_agent(objective: str, task: str, history: List[Dict[str, str]]) -> st
 
     """
 
-    # print("\n****RELEVANT CONTEXT****\n")
-    # print(context)
-    # print('')
     prompt = """
 You are playing the 1977 classic Colossal Cave. 
 
@@ -291,49 +211,29 @@ The games text parser is limited, keep your commands to one action and 1-3 words
 """
     prompt += f"Choose the next game input based on the following objective: {objective}\n"
     prompt += 'Take into account these previously completed tasks in the chat history'
-    prompt += f'\nYour task: {task}\n If nothing else remains to be done, return an empty string'
     messages = prompt_to_history(prompt) + history
     return openai_call(messages, max_tokens=2000)
 
 
-def next_game_input(
-    history: List[Dict[str, str]],
-    tasks_storage: SingleTaskListStorage,
-    current_game_task: str
-):
-    if not tasks_storage.is_empty():
-        # Print the task list
-        print("\033[95m\033[1m" + "\n*****TASK LIST*****\n" + "\033[0m\033[0m")
-        for t in tasks_storage.get_task_names():
-            print(" • " + str(t))
+# Decide if task has been completed
+def task_completion_agent(objective: str, history: List[Dict[str, str]]) -> str:
+    """
+    Executes a task based on the given objective and previous context.
 
-        # Step 1: Pull the first incomplete task
-        task = tasks_storage.popleft()
-        print("\033[92m\033[1m" + "\n*****NEXT TASK*****\n" + "\033[0m\033[0m")
-        print(str(task["task_name"]))
+    Args:
+        objective (str): The objective or goal for the AI to perform the task.
+        task (str): The task to be executed by the AI.
 
-        # Send to execution function to complete the task based on the context
-        result = player_agent(current_game_task, str(task["task_name"]), history)
-        print("\033[93m\033[1m" + "\n*****TASK RESULT*****\n" + "\033[0m\033[0m")
-        print(result)
+    Returns:
+        str: The response generated by the AI for the given task.
 
-        # Step 2: Add result to history
-        history.append({"role": "assistant", "content": result})
-    else:
-        result = ""
+    """
 
-    return result, history
+    prompt = "You are playing the 1977 classic Colossal Cave.\n"
 
+    prompt += f"Decide if the currnent objective has been completed. \n\n Objective: {objective}\n"
+    prompt += 'Take into account these previously completed tasks in the chat history'
+    prompt += f'Reply with a simple "COMPLETE" or "INCOMPLETE". Conversation history is below:\n'
+    messages = prompt_to_history(prompt) + history
+    return openai_call(messages, max_tokens=2000).lower() == "complete"
 
-def update_subtask_list(game_output: str, current_game_task: str, tasks_storage: SingleTaskListStorage) -> SingleTaskListStorage:
-    new_tasks = subtask_creation_agent(
-        current_game_task,
-        game_output,
-        tasks_storage.get_task_names(),
-    )
-
-    prioritized_list = prioritization_agent(tasks_storage, current_game_task)
-    if prioritized_list:
-        return prioritized_list
-    else:
-        return new_tasks
