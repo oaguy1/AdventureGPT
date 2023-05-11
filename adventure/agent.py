@@ -216,7 +216,7 @@ The games text parser is limited, keep your commands to one action and 1-3 words
 
 
 # Decide if task has been completed
-def task_completion_agent(objective: str, history: List[Dict[str, str]]) -> str:
+def task_completion_agent(objective: str, history: List[Dict[str, str]], max_history: int = 10) -> str:
     """
     Executes a task based on the given objective and previous context.
 
@@ -234,6 +234,7 @@ def task_completion_agent(objective: str, history: List[Dict[str, str]]) -> str:
     prompt += f"Decide if the currnent objective has been completed. \n\n Objective: {objective}\n"
     prompt += 'Take into account these previously completed tasks in the chat history'
     prompt += f'Reply with a simple "COMPLETE" or "INCOMPLETE". Conversation history is below:\n'
-    messages = prompt_to_history(prompt) + history
+    first_history_index = 0 if len(history) <= max_history else -1 * max_history
+    messages = prompt_to_history(prompt) + history[first_history_index:]
     return openai_call(messages, max_tokens=2000).lower() == "complete"
 
