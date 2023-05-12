@@ -11,28 +11,6 @@ from collections import deque
 LLM_MODEL = "gpt-3.5-turbo"
 MAX_LLM_TOKEN = 4096
 OPENAI_TEMPERATURE = 0.0
-OBJECTIVE = "Win the text based adventure game Colossal Cave Adventure"
-
-WALKTHROUGH = """
-Enter' building, and 'take' the keys and lamp. Now go 'out' of the building.
-Go down, down to the slit in the rock. Go South to the grate. Unlock grate with key, open grate. Go down.
-
-Go west, take the cage. Go west again, turn on the lamp. Grab the rod and say XYZZY. POOF you're back in the well house! Say XYZZY again to return to the Debris Room.
-
-Go west to the sloping room. Drop the rod. Go west to the Orange River Chamber. Grab the bird (it's afraid of the rod). Now go east and get the rod, and head back west again. Go down into the pit. You're in the caves!
-
-Level 1 is pretty easy. You start at the Hall of Mists. Head south and grab the gold (+7 score, +9 to drop off). Head north. Hall of the Mountain King, with a snake. Open the cage so the bird drives away the snake. OK, passages in all directions.
-
-To the west is a West Side Chamber with coins (+7 score, +5 drop off). Grab and go east again. To the south is the South Side Chamber with jewelry (+7 score, +5 drop off). Grab it and go north again. To the north is a chamber with a hole in it, with silver. Grab the silver (+7 score, +5 drop off).
-
-Go north one more room, to the Y2 room. Say "plugh" to zap back to the Well House. Drop off your treasures.
-
-Drop off the keys for now, then say "plugh" to return to Y2.
-
-If you hit a dwarf in here anywhere, and he throws an axe, take it! Then when you see him again, "throw axe at dwarf" to get him. If you miss, just "take axe" and throw it again.
-
-OK, now head to the Fissure, west of the Hall of Mists. Wave the Rod to make a crystal bridge appear. Cross it to grab the diamonds. Now head west and south to get into the Pirate Maze. You want to go EAST, SOUTH, then NORTH to get to the chest. When you take it, head SOUTHEAST, WEST and SOUTH to get down to the Orange Room. Just go east twice and then say XYZZY to pop back to the well house
-"""
 
 
 api_key = os.environ.get("OPENAI_API_KEY")
@@ -45,20 +23,29 @@ openai.api_key = api_key
 
 
 def prompt_to_history(prompt: str) -> List[Dict[str, str]]:
+    """
+    Convert a string into a message history format used by ChatGPT
+    """
     return [{"role": "system", "content": prompt}]
 
 
-def limit_tokens_from_string(string: str, model: str, limit: int) -> str:
-    """Limits the string to a number of tokens (estimated)."""
+def chunk_tokens_from_string(string: str, model: str = LLM_MODEL, chunk_size: int = 500) -> List[str]:
+    """
+    Chunks the string into blocks based on a number of tokens (estimated).
+    """
+    tokens = string.split()
+    total = len(tokens)
+    multiplier = 0
+    chunks = []
 
-    try:
-        encoding = tiktoken.encoding_for_model(model)
-    except:
-        encoding = tiktoken.encoding_for_model('gpt2')  # Fallback for others.
+    while multiplier * chunk_size < total:
+        start_idx = multiplier * chunk_size
+        if start_idx + chunk_size < total:
+           chunks.append(" ".join(tokens[start_idx:start_idx + chunk_size]))
+        else:
+           chunks.append(" ".join(tokens[start_idx:]))
 
-    encoded = encoding.encode(string)
-
-    return encoding.decode(encoded[:limit])
+    return chunks
 
 
 def openai_call(
@@ -67,6 +54,10 @@ def openai_call(
     temperature: float = OPENAI_TEMPERATURE,
     max_tokens: int = 100,
 ):
+    """
+    Call OpenAI using its chat completion API. Covers some nice expected
+    scenarios when hitting the API, such as rate limiting
+    """
     while True:
         try:
             # Use 4000 instead of the real limit (4097) to give a bit of wiggle room for the encoding of roles.
@@ -117,8 +108,11 @@ def openai_call(
 
 
 
-# Task storage supporting only a single instance of BabyAGI
 class SingleTaskListStorage:
+    """
+    A task list for storing game tasks
+    """
+
     def __init__(self, initial_list: list = []):
         self.tasks = deque(initial_list)
         self.task_id_counter = 0
@@ -128,6 +122,9 @@ class SingleTaskListStorage:
 
     def replace(self, tasks: List[Dict]):
         self.tasks = deque(tasks)
+
+    def concat(self, tasks):
+        self.tasks += deque(tasks.tasks)
 
     def popleft(self):
         return self.tasks.popleft()
@@ -149,11 +146,19 @@ class SingleTaskListStorage:
         return "\n".join([f'{i}. {t["task_name"]}' for i, t in enumerate(self.tasks)])
 
 
-def gametask_creation_agent(
-        objective: str = OBJECTIVE, walkthrough: str = WALKTHROUGH
-):
+def gametask_creation_agent(walkthrough: str):
+    """
+    Creates a list of game tasks to complete based on a given walthrough.
+
+    Args:
+        walkthrough (str): The text of the game walkthrough
+
+    Returns:
+        SingleTaskListStorage: A list of tasks to be completed to beat the game
+
+    """
     prompt = f"""
-You are to use the result from an execution agent to create new tasks with the following objective: {objective}.
+You are an agent tasked with creating a list of tasks in order win the text based adventure game Colossal Cave Adventure.
 
 Please utilize the following walkthrough to win the game:
 
@@ -164,9 +169,8 @@ Return one task per line in your response. The result must be a numbered list in
 #. First task
 #. Second task
 
-The number of each entry must be followed by a period. If your list is empty, write "There are no tasks to add at this time."
+The number of each entry must be followed by a period.
 Unless your list is empty, do not include any headers before your numbered list or follow your numbered list with any other output.
-
 """
 
     response = openai_call(prompt_to_history(prompt), max_tokens=2000)
@@ -188,13 +192,14 @@ Unless your list is empty, do not include any headers before your numbered list 
 
 
 # Execute a task based on the objective and five previous tasks
-def player_agent(objective: str, history: List[Dict[str, str]]) -> str:
+def player_agent(objective: str, history: List[Dict[str, str]], max_history: int = 20) -> str:
     """
-    Executes a task based on the given objective and previous context.
+    Executes a task based on the given objective and previous game history
 
     Args:
         objective (str): The objective or goal for the AI to perform the task.
-        task (str): The task to be executed by the AI.
+        history (list): What game inputs/outputs have been received. In the
+            form of OpenAI Conversation Prompt
 
     Returns:
         str: The response generated by the AI for the given task.
@@ -211,7 +216,8 @@ The games text parser is limited, keep your commands to one action and 1-3 words
 """
     prompt += f"Choose the next game input based on the following objective: {objective}\n"
     prompt += 'Take into account these previously completed tasks in the chat history'
-    messages = prompt_to_history(prompt) + history
+    first_history_index = 0 if len(history) <= max_history else -1 * max_history
+    messages = prompt_to_history(prompt) + history[first_history_index:]
     return openai_call(messages, max_tokens=2000)
 
 
