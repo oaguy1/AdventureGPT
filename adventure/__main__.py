@@ -37,11 +37,15 @@ class Loop():
         self.completed_tasks = SingleTaskListStorage()
         self.walkthrough_path = walkthrough_path
         self.output_file_path = output_file_path
+        self.current_task = None
 
     def next_game_task(self):
         print("***************** TASK LIST *******************")
         print(self.game_tasks)
         print()
+        if self.current_task:
+            self.completed_tasks.append({"task_name": self.current_task})
+
         next_task = self.game_tasks.popleft()
         if next_task:
             self.current_task = next_task["task_name"]
@@ -92,7 +96,7 @@ class Loop():
 
         while not self.game.is_finished:
             # Ask Player Agent what to do next
-            result = player_agent(self.current_task, self.history)
+            result = player_agent(self.current_task, self.history, self.completed_tasks)
             self.history.append({"role": "assistant", "content": result})
            
             # split lines by newlines and periods and flatten list

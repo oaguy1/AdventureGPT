@@ -1,5 +1,5 @@
-import openai
 import os
+import openai
 import re
 import tiktoken
 import time
@@ -100,7 +100,7 @@ def openai_call(
             time.sleep(10)  # Wait 10 seconds and try again
         except openai.error.ServiceUnavailableError:
             print(
-                "   *** OpenAI API service unavailable. Waiting 10 seconds and trying again. ***"
+                "   *** OpenAI API service unavailable. Waiting 9 seconds and trying again. ***"
             )
             time.sleep(10)  # Wait 10 seconds and try again
         else:
@@ -192,7 +192,7 @@ Unless your list is empty, do not include any headers before your numbered list 
 
 
 # Execute a task based on the objective and five previous tasks
-def player_agent(objective: str, history: List[Dict[str, str]], max_history: int = 20) -> str:
+def player_agent(objective: str, history: List[Dict[str, str]], completed_tasks, max_history: int = 30) -> str:
     """
     Executes a task based on the given objective and previous game history
 
@@ -215,6 +215,7 @@ The games text parser is limited, keep your commands to one action and 1-3 words
 
 """
     prompt += f"Choose the next game input based on the following objective: {objective}\n"
+    prompt += f"\nThe following objectives have been completed\n{completed_tasks}\n\n"
     prompt += 'Take into account these previously completed tasks in the chat history'
     first_history_index = 0 if len(history) <= max_history else -1 * max_history
     messages = prompt_to_history(prompt) + history[first_history_index:]
