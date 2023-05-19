@@ -1,3 +1,12 @@
+"""
+OpenAI based agents for interactiving in the game world
+
+Copyright 2023 Lily Hughes-Robinson.
+
+Licensed as free software under the
+Apache License, Version 2.0 as detailed in the accompanying README.txt.
+"""
+
 import os
 import openai
 import re
