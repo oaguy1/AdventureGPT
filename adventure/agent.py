@@ -155,7 +155,62 @@ class SingleTaskListStorage:
         return "\n".join([f'{i}. {t["task_name"]}' for i, t in enumerate(self.tasks)])
 
 
-def gametask_creation_agent(walkthrough: str):
+def openai_task_response_to_list(response: str):
+    new_tasks = response.split('\n')
+    new_tasks_list = []
+    for task_string in new_tasks:
+        task_parts = task_string.strip().split(".", 1)
+        if len(task_parts) == 2:
+            task_id = ''.join(s for s in task_parts[0] if s.isnumeric())
+            task_name = re.sub(r'[^\w\s_]+', '', task_parts[1]).strip()
+            if task_name.strip() and task_id.isnumeric():
+                new_tasks_list.append(task_name)
+
+    return [{"task_name": task_name} for task_name in new_tasks_list]
+
+          
+def gametask_creation_agent(history: List[Dict[str, str]], max_history: int = 30) -> SingleTaskListStorage:
+    """
+    Creates a list of game tasks to complete based game history
+    
+    Args:
+        history (list): What game inputs/outputs have been received. In the
+            form of OpenAI Conversation Prompt
+        max_history (int): The max number of historical prompt/responses to give to the API
+
+    Returns:
+        SingleTaskListStorage: A list of tasks to be completed to beat the game
+
+    """
+    prompt = f"""
+You are an agent tasked with creating a list of tasks in order win the text based adventure game Colossal Cave Adventure.
+
+Here is a guide on how to win:
+
+1. Explore every space, You may have to move in a direction rather than entering directly
+2. Examine or read every object. There may be more details that will help later on
+3. Pick up or take every object you can. Inventory command will remind you of what you have. If you hit a limit of what you can carry, you may need to drop some items
+4. Try any and every very you can think of when in new spaces. Experimenting is required to beat every textbased adventure
+
+Return one task per line in your response. The result must be a numbered list in the format:
+
+#. First task
+#. Second task
+
+The number of each entry must be followed by a period.
+Unless your list is empty, do not include any headers before your numbered list or follow your numbered list with any other output.
+
+"""
+
+    prompt += 'Take into account the game history attached here:'
+    first_history_index = 0 if len(history) <= max_history else -1 * max_history
+    messages = prompt_to_history(prompt) + history[first_history_index:]
+    response = openai_call(messages, max_tokens=2000)
+    task_list = openai_task_response_to_list(response)
+    return SingleTaskListStorage(task_list)
+
+
+def walkthrough_gametask_creation_agent(walkthrough: str):
     """
     Creates a list of game tasks to complete based on a given walthrough.
 
@@ -183,24 +238,51 @@ Unless your list is empty, do not include any headers before your numbered list 
 """
 
     response = openai_call(prompt_to_history(prompt), max_tokens=2000)
-    new_tasks = response.split('\n')
-    new_tasks_list = []
-    for task_string in new_tasks:
-        task_parts = task_string.strip().split(".", 1)
-        if len(task_parts) == 2:
-            task_id = ''.join(s for s in task_parts[0] if s.isnumeric())
-            task_name = re.sub(r'[^\w\s_]+', '', task_parts[1]).strip()
-            if task_name.strip() and task_id.isnumeric():
-                new_tasks_list.append(task_name)
-
-    output = [{"task_name": task_name} for task_name in new_tasks_list]
-
-    tasks_storage = SingleTaskListStorage(output)
-
-    return tasks_storage
+    task_list = openai_task_response_to_list(response)
+    return SingleTaskListStorage(task_list)
 
 
-# Execute a task based on the objective and five previous tasks
+def prioritization_agent(task_storage: SingleTaskListStorage, history: List[Dict[str, str]], max_history: int = 30) -> SingleTaskListStorage:
+    """
+    Given a SingleTaskListStorage and game history, prioritize the task list to be more effective
+
+    Args:
+        task_storage (SingleTaskListStorage): The current task list
+        history (list): What game inputs/outputs have been received. In the
+            form of OpenAI Conversation Prompt
+        max_history (int): The max number of historical prompt/responses to give to the API
+
+    Returns:
+        SingleTaskListStorage: A list of tasks to be completed to beat the game
+
+    """
+    task_names = task_storage.get_task_names()
+    bullet_string = '\n'
+
+    prompt = f"""
+You are tasked with prioritizing the following tasks: {bullet_string + bullet_string.join(task_names)}
+Consider the ultimate objective of winning the game.
+Tasks should be sorted from highest to lowest priority, where higher-priority tasks are those that act as pre-requisites or are more essential for meeting the objective.
+Do not remove any tasks. Return the ranked tasks as a numbered list in the format:
+
+#. First task
+#. Second task
+
+The entries must be consecutively numbered, starting with 1. The number of each entry must be followed by a period.
+Do not include any headers before your ranked list or follow your list with any other output."""
+
+    prompt += 'Take into account these previously completed tasks in the chat history'
+    first_history_index = 0 if len(history) <= max_history else -1 * max_history
+    messages = prompt_to_history(prompt) + history[first_history_index:]
+    response = openai_call(messages, max_tokens=2000)
+    if not response:
+        # Received empty response from priotritization agent. Keeping task list unchanged.
+        return task_storage
+
+    new_tasks = openai_task_response_to_list(response)
+    return SingleTaskListStorage(new_tasks)
+
+
 def player_agent(objective: str, history: List[Dict[str, str]], completed_tasks, max_history: int = 30) -> str:
     """
     Executes a task based on the given objective and previous game history

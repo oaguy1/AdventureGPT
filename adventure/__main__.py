@@ -18,7 +18,15 @@ import pprint
 from time import sleep
 
 from adventure import load_advent_dat
-from adventure.agent import gametask_creation_agent, player_agent, task_completion_agent, chunk_tokens_from_string, SingleTaskListStorage
+from adventure.agent import (
+        gametask_creation_agent, 
+        walkthrough_gametask_creation_agent,
+        prioritization_agent,
+        player_agent, 
+        task_completion_agent, 
+        chunk_tokens_from_string, 
+        SingleTaskListStorage
+    )
 from adventure.game import Game
 
 
@@ -64,10 +72,22 @@ class Loop():
     def loop(self):
         """ Main Game Loop """
         print("***************** INITIALIZING GAME *******************")
-        text_chunks = []
-        chunk_size = 500
+        self.game = Game()
+        load_advent_dat(self.game)
+        self.game.start()
+        next_input = self.game.output
+        self.baudout(next_input)
+        self.history.append({
+            "role": "system", "content": next_input
+        })
         
+        # if usng walkthrough, read into memory in chunks of 500ish tokens
+        # and pass to walkthrough gametask agent, else use gametask_creation_agent
+        # with the limited history
         if self.walkthrough_path:
+            text_chunks = []
+            chunk_size = 500
+            
             with open(self.walkthrough_path, 'r') as f:
                 curr_chunk = []
                 for line in f:
@@ -79,20 +99,13 @@ class Loop():
                         curr_chunk = []
 
 
-        for chunk in text_chunks:
-            tasks = gametask_creation_agent(chunk)
-            self.game_tasks.concat(tasks)
+            for chunk in text_chunks:
+                tasks = walkthrough_gametask_creation_agent(chunk)
+                self.game_tasks.concat(tasks)
+        else:
+            self.game_tasks = gametask_creation_agent(self.history)
 
         self.next_game_task()
-        
-        self.game = Game()
-        load_advent_dat(self.game)
-        self.game.start()
-        next_input = self.game.output
-        self.baudout(next_input)
-        self.history.append({
-            "role": "system", "content": next_input
-        })
 
         while not self.game.is_finished:
             # Ask Player Agent what to do next
@@ -114,8 +127,14 @@ class Loop():
                     })
                     self.baudout(f"> {line}\n\n")
                     self.baudout(command_output)
-                    completed = task_completion_agent(self.current_task, self.history)
 
+                    # if not using a walthrough, come up with more tasks and prioritize
+                    if not self.walkthrough_path:
+                        new_tasks = gametask_creation_agent(self.history)
+                        self.game_tasks.concat(new_tasks)
+                        self.game_tasks = prioritization_agent(self.game_tasks, self.history)
+                    
+                    completed = task_completion_agent(self.current_task, self.history)
                     if completed:
                         self.next_game_task()
 
@@ -125,7 +144,7 @@ if __name__ == '__main__':
         prog="AdventureGPT",
         description="A modified port of the game ADVENTURE played by ChatGPT"
     )
-    parser.add_argument("walkthrough_path")
+    parser.add_argument("-w", "--walkthrough_path")
     parser.add_argument("-o", "--output_path")
     args = parser.parse_args()
 
