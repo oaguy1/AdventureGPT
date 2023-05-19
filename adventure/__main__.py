@@ -1,75 +1,54 @@
 """
-Offer Adventure at a custom command prompt.
+Create a shell through which the LLM agents can play Adventure.
 
-Copyright 2010-2015 Brandon Rhodes.  Licensed as free software under the
+Copyright 2010-2015 Brandon Rhodes.
+Copyright 2023 Lily Hughes-Robinson.
+
+Licensed as free software under the
 Apache License, Version 2.0 as detailed in the accompanying README.txt.
 """
 import argparse
+import functools
 import os
+import operator
 import re
 import readline
 import sys
-import tiktoken
-import openai
 import pprint
 from time import sleep
 
 from adventure import load_advent_dat
+from adventure.agent import gametask_creation_agent, player_agent, task_completion_agent, chunk_tokens_from_string, SingleTaskListStorage
 from adventure.game import Game
 
+
 BAUD = 1200
-LLM = "gpt-3.5-turbo"
-MAX_LLM_TOKEN = 4096
-INTRO = """
 
-You are playing the 1977 classic Colossal Cave. 
-
-If you ask the same question in a loop, use the "help" command to get out of the loop. Don't get frustrated and only take one item at a time.
-
-
-The games text parser is limited, keep your commands to one action and 1-3 words. Enter a single command for each prompt.. Use the following guide to beat the game. Look around and e what is visible. if your objective is invisible, keep moving. You can only move north, south, east, and west.
-
-----------------------
-
-FROM: https://lisashea.com/gaming/strategy_lib_adwalk.html
-
-Getting In to the Caves
-
-
-'Enter' building, and 'take' the keys and lamp. Now go 'out' of the building.
-Go down, down to the slit in the rock. Go South to the grate. Unlock grate with key, open grate. Go down.
-
-Go west, take the cage. Go west again, turn on the lamp. Grab the rod and say XYZZY. POOF you're back in the well house! Say XYZZY again to return to the Debris Room.
-
-Go west to the sloping room. Drop the rod. Go west to the Orange River Chamber. Grab the bird (it's afraid of the rod). Now go east and get the rod, and head back west again. Go down into the pit. You're in the caves!
-
-
-Level 1 - Snakes and Plughs
-
-
-Level 1 is pretty easy. You start at the Hall of Mists. Head south and grab the gold (+7 score, +9 to drop off). Head north. Hall of the Mountain King, with a snake. Open the cage so the bird drives away the snake. OK, passages in all directions. 
-
-To the west is a West Side Chamber with coins (+7 score, +5 drop off). Grab and go east again. To the south is the South Side Chamber with jewelry (+7 score, +5 drop off). Grab it and go north again. To the north is a chamber with a hole in it, with silver. Grab the silver (+7 score, +5 drop off). 
-
-Go north one more room, to the Y2 room. Say "plugh" to zap back to the Well House. Drop off your treasures. 
-
-Drop off the keys for now, then say "plugh" to return to Y2. 
-
-If you hit a dwarf in here anywhere, and he throws an axe, take it! Then when you see him again, "throw axe at dwarf" to get him. If you miss, just "take axe" and throw it again. 
-
-OK, now head to the Fissure, west of the Hall of Mists. Wave the Rod to make a crystal bridge appear. Cross it to grab the diamonds. Now head west and south to get into the Pirate Maze. You want to go EAST, SOUTH, then NORTH to get to the chest. When you take it, head SOUTHEAST, WEST and SOUTH to get down to the Orange Room. Just go east twice and then say XYZZY to pop back to the well house. 
-
-"""
 
 class Loop():
+    """
+    The loop that does it all! Inits and plays the game in a loop until the
+    game is won or an exception is thrown
+    """
 
-    def __init__(self, args):
-        self.history = [
-            {
-                "role": "system", "content": INTRO
-            }
-        ]
-        self.loop(args)
+    def __init__(self, walkthrough_path: str = "", output_file_path: str = "game_output.txt"):
+        self.history = []
+        self.game_tasks = SingleTaskListStorage()
+        self.completed_tasks = SingleTaskListStorage()
+        self.walkthrough_path = walkthrough_path
+        self.output_file_path = output_file_path
+        self.current_task = None
+
+    def next_game_task(self):
+        print("***************** TASK LIST *******************")
+        print(self.game_tasks)
+        print()
+        if self.current_task:
+            self.completed_tasks.append({"task_name": self.current_task})
+
+        next_task = self.game_tasks.popleft()
+        if next_task:
+            self.current_task = next_task["task_name"]
 
     def baudout(self, s: str):
         out = sys.stdout
@@ -79,49 +58,54 @@ class Loop():
             out.flush()
 
     def dump_history(self):
-        pprint.pprint(self.history)
+        with open(self.output_file_path, 'w') as f:
+            pprint.pprint(self.history, stream=f)
 
-    def loop(self, args):
-        parser = argparse.ArgumentParser(
-            description='Adventure into the Colossal Caves.',
-            prog='{} -m adventure'.format(os.path.basename(sys.executable)))
-        parser.add_argument(
-            'savefile', nargs='?', help='The filename of game you have saved.')
-        args = parser.parse_args(args)
-
-        api_key = os.environ.get("OPENAI_API_KEY")
+    def loop(self):
+        """ Main Game Loop """
+        print("***************** INITIALIZING GAME *******************")
+        text_chunks = []
+        chunk_size = 500
         
-        if not api_key:
-            api_key = input("OpenAI Key:")
-            os.environ["OPENAI_API_KEY"] = api_key
+        if self.walkthrough_path:
+            with open(self.walkthrough_path, 'r') as f:
+                curr_chunk = []
+                for line in f:
+                    tokens = line.split()
+                    curr_chunk += tokens
 
-        openai.api_key = api_key
+                    if len(curr_chunk) >= chunk_size:
+                        text_chunks.append(" ".join(curr_chunk))
+                        curr_chunk = []
 
-        if args.savefile is None:
-            self.game = Game()
-            load_advent_dat(self.game)
-            self.game.start()
-            next_input = self.game.output
-            self.baudout(next_input)
-            self.history.append({
-                "role": "system", "content": next_input
-            })
-        else:
-            self.game = Game.resume(args.savefile)
-            self.baudout('GAME RESTORED\n')
+
+        for chunk in text_chunks:
+            tasks = gametask_creation_agent(chunk)
+            self.game_tasks.concat(tasks)
+
+        self.next_game_task()
+        
+        self.game = Game()
+        load_advent_dat(self.game)
+        self.game.start()
+        next_input = self.game.output
+        self.baudout(next_input)
+        self.history.append({
+            "role": "system", "content": next_input
+        })
 
         while not self.game.is_finished:
-            lines = "" 
-            while not lines:
-                try:
-                    response = openai.ChatCompletion.create(model=LLM, messages=self.history, temperature=0)
-                    lines = response['choices'][0]['message']['content'].lower() 
-                except:
-                    self.baudout("OpenAI is being cranky...\n")
-                    sleep(10)
+            # Ask Player Agent what to do next
+            result = player_agent(self.current_task, self.history, self.completed_tasks)
+            self.history.append({"role": "assistant", "content": result})
+           
+            # split lines by newlines and periods and flatten list
+            newline_split = result.lower().split('\n')
+            period_split = [ line.split('.') for line in newline_split ]
+            split_lines = functools.reduce(operator.iconcat, period_split, []) 
             
-            self.history.append(response['choices'][0]['message'])
-            for line in lines.split('.'):
+            # We got input! Act on it.
+            for line in split_lines:
                 words = re.findall(r'\w+', line)
                 if words:
                     command_output = self.game.do_command(words)
@@ -130,11 +114,27 @@ class Loop():
                     })
                     self.baudout(f"> {line}\n\n")
                     self.baudout(command_output)
+                    completed = task_completion_agent(self.current_task, self.history)
+
+                    if completed:
+                        self.next_game_task()
+
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        prog="AdventureGPT",
+        description="A modified port of the game ADVENTURE played by ChatGPT"
+    )
+    parser.add_argument("walkthrough_path")
+    parser.add_argument("-o", "--output_path")
+    args = parser.parse_args()
+
     try:
-        loop = Loop(sys.argv[1:])
+        loop = Loop(args.walkthrough_path, args.output_path)
+        loop.loop()
     except EOFError:
         pass
-    except:
+    except KeyboardInterrupt:
+        pass
+    finally:
         loop.dump_history()
