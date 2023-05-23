@@ -1,0 +1,22 @@
+[project]
+name = "adventuregpt"
+version = "1.0.0"
+authors = [
+  { name="Lily Hughes-Robinson", email="oaguy1@gmail.com" },
+]
+description = "The game ADVENTURE played by ChatGPT"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "adventure ~=1.6",
+    "openai ~=0.27.7",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
