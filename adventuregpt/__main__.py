@@ -9,16 +9,16 @@ Apache License, Version 2.0 as detailed in the accompanying README.txt.
 """
 import argparse
 import functools
-import os
 import operator
 import re
-import readline
 import sys
 import pprint
 from time import sleep
 
 from adventure import load_advent_dat
-from adventure.agent import (
+from adventure.game import Game
+
+from adventuregpt.agent import (
         gametask_creation_agent, 
         walkthrough_gametask_creation_agent,
         prioritization_agent,
@@ -27,7 +27,6 @@ from adventure.agent import (
         chunk_tokens_from_string, 
         SingleTaskListStorage
     )
-from adventure.game import Game
 
 
 BAUD = 1200
@@ -71,16 +70,7 @@ class Loop():
 
     def loop(self):
         """ Main Game Loop """
-        print("***************** INITIALIZING GAME *******************")
-        self.game = Game()
-        load_advent_dat(self.game)
-        self.game.start()
-        next_input = self.game.output
-        self.baudout(next_input)
-        self.history.append({
-            "role": "system", "content": next_input
-        })
-        
+        print("***************** INITIALIZING GAME *******************") 
         # if usng walkthrough, read into memory in chunks of 500ish tokens
         # and pass to walkthrough gametask agent, else use gametask_creation_agent
         # with the limited history
@@ -106,6 +96,15 @@ class Loop():
             self.game_tasks = gametask_creation_agent(self.history)
 
         self.next_game_task()
+        
+        self.game = Game()
+        load_advent_dat(self.game)
+        self.game.start()
+        next_input = self.game.output
+        self.baudout(next_input)
+        self.history.append({
+            "role": "system", "content": next_input
+        })
 
         while not self.game.is_finished:
             # Ask Player Agent what to do next
@@ -142,7 +141,7 @@ class Loop():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog="AdventureGPT",
-        description="A modified port of the game ADVENTURE played by ChatGPT"
+        description="The game ADVENTURE played by ChatGPT"
     )
     parser.add_argument("-w", "--walkthrough_path")
     parser.add_argument("-o", "--output_path")
