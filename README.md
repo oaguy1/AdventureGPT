@@ -14,9 +14,10 @@ Currently, the only requirement is an OpenAI API key and to have it set as the `
 
 ## Running
 
-Run the code by cloning the repository, navigate to the cloned repository, and run the following command:
+Run the code by cloning the repository, navigate to the cloned repository, and run the following commands:
 
 ```bash
+python -m pip install -r requirements.txt
 python -m adventuregpt
 ```
 Add a `--help` flag to see the command line arguments.
