@@ -32,7 +32,6 @@ SOFTWARE.
 import os
 import openai
 import re
-import tiktoken
 import time
 
 from typing import Dict, List, Union
