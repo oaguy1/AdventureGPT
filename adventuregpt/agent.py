@@ -74,6 +74,7 @@ def chunk_tokens_from_string(string: str, model: str = LLM_MODEL, chunk_size: in
            chunks.append(" ".join(tokens[start_idx:start_idx + chunk_size]))
         else:
            chunks.append(" ".join(tokens[start_idx:]))
+        multipier += 1
 
     return chunks
 
