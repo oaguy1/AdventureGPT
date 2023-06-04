@@ -19,11 +19,11 @@ from adventure import load_advent_dat
 from adventure.game import Game
 
 from adventuregpt.agent import (
-        gametask_creation_agent, 
-        walkthrough_gametask_creation_agent,
-        prioritization_agent,
-        player_agent, 
-        task_completion_agent, 
+        GametaskCreationAgent,
+        WalkthroughGametaskCreationAgent,
+        PrioritizationAgent,
+        PlayerAgent,
+        TaskCompletionAgent,
         SingleTaskListStorage
     )
 
@@ -44,6 +44,11 @@ class Loop():
         self.walkthrough_path = walkthrough_path
         self.output_file_path = output_file_path
         self.current_task = None
+        self.game_task_creation_agent = GametaskCreationAgent()
+        self.walkthrough_game_task_creation_agent = WalkthroughGametaskCreationAgent()
+        self.prioritization_agent = PrioritizationAgent()
+        self.player_agent = PlayerAgent()
+        self.task_creation_agent = TaskCompletionAgent()
 
     def next_game_task(self):
         print("***************** TASK LIST *******************")
@@ -89,25 +94,25 @@ class Loop():
 
 
             for chunk in text_chunks:
-                tasks = walkthrough_gametask_creation_agent(chunk)
+                tasks = self.walkthrough_gametask_creation_agent.run(chunk)
                 self.game_tasks.concat(tasks)
         else:
-            self.game_tasks = gametask_creation_agent(self.history)
+            self.game_tasks = self.gametask_creation_agent.run(self.history)
 
         self.next_game_task()
         
         self.game = Game()
         load_advent_dat(self.game)
         self.game.start()
-        next_input = self.game.output
-        self.baudout(next_input)
+        curr_game_output = self.game.output
+        self.baudout(curr_game_output)
         self.history.append({
-            "role": "system", "content": next_input
+            "role": "system", "content": curr_game_output
         })
 
         while not self.game.is_finished:
             # Ask Player Agent what to do next
-            result = player_agent(self.current_task, self.history, self.completed_tasks)
+            result = self.player_agent.run(self.current_task, curr_game_output, self.completed_tasks)
             self.history.append({"role": "assistant", "content": result})
            
             # split lines by newlines and periods and flatten list
@@ -119,20 +124,20 @@ class Loop():
             for line in split_lines:
                 words = re.findall(r'\w+', line)
                 if words:
-                    command_output = self.game.do_command(words)
+                    curr_game_output = self.game.do_command(words)
                     self.history.append({
                         "role": "system", "content": command_output
                     })
                     self.baudout(f"> {line}\n\n")
-                    self.baudout(command_output)
+                    self.baudout(curr_game_output)
 
                     # if not using a walthrough, come up with more tasks and prioritize
                     if not self.walkthrough_path:
-                        new_tasks = gametask_creation_agent(self.history)
+                        new_tasks = self.gametask_creation_agent.run(curr_game_output)
                         self.game_tasks.concat(new_tasks)
-                        self.game_tasks = prioritization_agent(self.game_tasks, self.history)
+                        self.game_tasks = self.prioritization_agent.run(self.game_tasks, curr_game_output)
                     
-                    completed = task_completion_agent(self.current_task, self.history)
+                    completed = self.task_completion_agent.run(self.current_task, curr_game_output)
                     if completed:
                         self.next_game_task()
 

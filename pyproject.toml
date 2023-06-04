@@ -1,6 +1,6 @@
 [project]
 name = "adventuregpt"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
   { name="Lily Hughes-Robinson", email="oaguy1@gmail.com" },
 ]
@@ -15,6 +15,7 @@ classifiers = [
 dependencies = [
     "adventure ~=1.6",
     "openai ~=0.27.7",
+    "langchain==0.0.189",
 ]
 
 [build-system]

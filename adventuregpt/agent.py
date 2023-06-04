@@ -30,10 +30,23 @@ SOFTWARE.
 """
 
 import os
-import openai
 import re
 import time
 
+from langchain.chains import ConversationChain
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain.prompts.chat import (
+    ChatPromptTemplate,
+    MessagPlaceholder,
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
+from langchain.schema import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage
+)
 from typing import Dict, List, Union
 from collections import deque
 
@@ -48,94 +61,6 @@ api_key = os.environ.get("OPENAI_API_KEY")
 if not api_key:
     api_key = input("OpenAI Key:")
     os.environ["OPENAI_API_KEY"] = api_key
-
-openai.api_key = api_key
-
-
-def prompt_to_history(prompt: str) -> List[Dict[str, str]]:
-    """
-    Convert a string into a message history format used by ChatGPT
-    """
-    return [{"role": "system", "content": prompt}]
-
-
-def chunk_tokens_from_string(string: str, model: str = LLM_MODEL, chunk_size: int = 500) -> List[str]:
-    """
-    Chunks the string into blocks based on a number of tokens (estimated).
-    """
-    tokens = string.split()
-    total = len(tokens)
-    multiplier = 0
-    chunks = []
-
-    while multiplier * chunk_size < total:
-        start_idx = multiplier * chunk_size
-        if start_idx + chunk_size < total:
-           chunks.append(" ".join(tokens[start_idx:start_idx + chunk_size]))
-        else:
-           chunks.append(" ".join(tokens[start_idx:]))
-        multipier += 1
-
-    return chunks
-
-
-def openai_call(
-    messages: str,
-    model: str = LLM_MODEL,
-    temperature: float = OPENAI_TEMPERATURE,
-    max_tokens: int = 100,
-):
-    """
-    Call OpenAI using its chat completion API. Covers some nice expected
-    scenarios when hitting the API, such as rate limiting
-    """
-    while True:
-        try:
-            # Use 4000 instead of the real limit (4097) to give a bit of wiggle room for the encoding of roles.
-            # TODO: different limits for different models.
-
-            # Use chat completion API
-            response = openai.ChatCompletion.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                n=1,
-                stop=None,
-            )
-            return response.choices[0].message.content.strip()
-        except openai.error.RateLimitError:
-            print(
-                "   *** The OpenAI API rate limit has been exceeded. Waiting 10 seconds and trying again. ***"
-            )
-            time.sleep(10)  # Wait 10 seconds and try again
-        except openai.error.Timeout:
-            print(
-                "   *** OpenAI API timeout occurred. Waiting 10 seconds and trying again. ***"
-            )
-            time.sleep(10)  # Wait 10 seconds and try again
-        except openai.error.APIError:
-            print(
-                "   *** OpenAI API error occurred. Waiting 10 seconds and trying again. ***"
-            )
-            time.sleep(10)  # Wait 10 seconds and try again
-        except openai.error.APIConnectionError:
-            print(
-                "   *** OpenAI API connection error occurred. Check your network settings, proxy configuration, SSL certificates, or firewall rules. Waiting 10 seconds and trying again. ***"
-            )
-            time.sleep(10)  # Wait 10 seconds and try again
-        except openai.error.InvalidRequestError:
-            print(
-                "   *** OpenAI API invalid request. Check the documentation for the specific API method you are calling and make sure you are sending valid and complete parameters. Waiting 10 seconds and trying again. ***"
-            )
-            time.sleep(10)  # Wait 10 seconds and try again
-        except openai.error.ServiceUnavailableError:
-            print(
-                "   *** OpenAI API service unavailable. Waiting 9 seconds and trying again. ***"
-            )
-            time.sleep(10)  # Wait 10 seconds and try again
-        else:
-            break
 
 
 class SingleTaskListStorage:
@@ -189,21 +114,26 @@ def openai_task_response_to_list(response: str):
 
     return [{"task_name": task_name} for task_name in new_tasks_list]
 
-          
-def gametask_creation_agent(history: List[Dict[str, str]], max_history: int = 30) -> SingleTaskListStorage:
-    """
-    Creates a list of game tasks to complete based game history
-    
-    Args:
-        history (list): What game inputs/outputs have been received. In the
-            form of OpenAI Conversation Prompt
-        max_history (int): The max number of historical prompt/responses to give to the API
 
-    Returns:
-        SingleTaskListStorage: A list of tasks to be completed to beat the game
-
+class ConversationAgent:
     """
-    prompt = f"""
+    Basline agent class
+    """
+
+    def __init__(self):
+        self.llm = ChatOpenAI(temperture=OPENAI_TEMPERATURE)
+        self.memory = ConversationBufferMemory(return_messages=True)
+
+
+class GameTaskCreationAgent(ConversationAgent):
+    """
+    Agent that creates a list of game tasks to complete based game history
+    """
+
+    def __init(self):
+        super()
+        self.prompt = ChatPromptTemplate.from_messages([
+            SystemMessagePromptTemplate.from_template("""
 You are an agent tasked with creating a list of tasks in order win the text based adventure game Colossal Cave Adventure.
 
 Here is a guide on how to win:
@@ -221,28 +151,37 @@ Return one task per line in your response. The result must be a numbered list in
 The number of each entry must be followed by a period.
 Unless your list is empty, do not include any headers before your numbered list or follow your numbered list with any other output.
 
-"""
-
-    prompt += 'Take into account the game history attached here:'
-    first_history_index = 0 if len(history) <= max_history else -1 * max_history
-    messages = prompt_to_history(prompt) + history[first_history_index:]
-    response = openai_call(messages, max_tokens=2000)
-    task_list = openai_task_response_to_list(response)
-    return SingleTaskListStorage(task_list)
+"""),
+            MessagPlaceholder(variable_name="history"),
+            HumanMessagePromptTemplate.from_template("{input}")
+        ])
+        self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
 
 
-def walkthrough_gametask_creation_agent(walkthrough: str):
+    def run(message: str) -> SingleTaskListStorage:
+        """
+        Creates a list of game tasks to complete based game history
+        
+        Args:
+            message (str): next game input
+
+        Returns:
+            SingleTaskListStorage: A list of tasks to be completed to beat the game
+
+        """
+        response = self.conversation.predict(message=message)
+        task_list = openai_task_response_to_list(response)
+        return SingleTaskListStorage(task_list)
+
+
+class WalkthroughGameTaskCreationAgent(ConversationAgent):
     """
-    Creates a list of game tasks to complete based on a given walthrough.
-
-    Args:
-        walkthrough (str): The text of the game walkthrough
-
-    Returns:
-        SingleTaskListStorage: A list of tasks to be completed to beat the game
-
+    Agent that creates a list of game tasks to complete based on a given walthrough.
     """
-    prompt = f"""
+
+    def __init__(self):
+        self.prompt = ChatPromptTemplate.from_messages([
+            SystemMessagePromptTemplate.from_template("""
 You are an agent tasked with creating a list of tasks in order win the text based adventure game Colossal Cave Adventure.
 
 Please utilize the following walkthrough to win the game:
@@ -256,32 +195,37 @@ Return one task per line in your response. The result must be a numbered list in
 
 The number of each entry must be followed by a period.
 Unless your list is empty, do not include any headers before your numbered list or follow your numbered list with any other output.
-"""
-
-    response = openai_call(prompt_to_history(prompt), max_tokens=2000)
-    task_list = openai_task_response_to_list(response)
-    return SingleTaskListStorage(task_list)
+"""),
+        ])
+        self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
 
 
-def prioritization_agent(task_storage: SingleTaskListStorage, history: List[Dict[str, str]], max_history: int = 30) -> SingleTaskListStorage:
+    def run(walkthrough: str) -> SingleTaskListStorage:
+        """
+        Creates a list of game tasks to complete based game history
+        
+        Args:
+            walkthrough (str): The text of the walkthrough to summarize
+
+        Returns:
+            SingleTaskListStorage: A list of tasks to be completed to beat the game
+
+        """
+        response = self.conversation.predict(walkthrough=walkthrough)
+        task_list = openai_task_response_to_list(response)
+        return SingleTaskListStorage(task_list)
+
+
+class PrioritizationAgent(ConversationAgent):
     """
-    Given a SingleTaskListStorage and game history, prioritize the task list to be more effective
-
-    Args:
-        task_storage (SingleTaskListStorage): The current task list
-        history (list): What game inputs/outputs have been received. In the
-            form of OpenAI Conversation Prompt
-        max_history (int): The max number of historical prompt/responses to give to the API
-
-    Returns:
-        SingleTaskListStorage: A list of tasks to be completed to beat the game
-
+    Agent that given a SingleTaskListStorage prioritizes the task list to be more effective
     """
-    task_names = task_storage.get_task_names()
-    bullet_string = '\n'
 
-    prompt = f"""
-You are tasked with prioritizing the following tasks: {bullet_string + bullet_string.join(task_names)}
+    def __init(self):
+        super()
+        self.prompt = ChatPromptTemplate.from_messages([
+            SystemMessagePromptTemplate.from_template("""
+You are tasked with prioritizing a task list
 Consider the ultimate objective of winning the game.
 Tasks should be sorted from highest to lowest priority, where higher-priority tasks are those that act as pre-requisites or are more essential for meeting the objective.
 Do not remove any tasks. Return the ranked tasks as a numbered list in the format:
@@ -290,70 +234,116 @@ Do not remove any tasks. Return the ranked tasks as a numbered list in the forma
 #. Second task
 
 The entries must be consecutively numbered, starting with 1. The number of each entry must be followed by a period.
-Do not include any headers before your ranked list or follow your list with any other output."""
-
-    prompt += 'Take into account these previously completed tasks in the chat history'
-    first_history_index = 0 if len(history) <= max_history else -1 * max_history
-    messages = prompt_to_history(prompt) + history[first_history_index:]
-    response = openai_call(messages, max_tokens=2000)
-    if not response:
-        # Received empty response from priotritization agent. Keeping task list unchanged.
-        return task_storage
-
-    new_tasks = openai_task_response_to_list(response)
-    return SingleTaskListStorage(new_tasks)
+Do not include any headers before your ranked list or follow your list with any other output."""),
+            HumanMessagePromptTemplate.from_template("This is the task list: {tasks}")
+        ])
+        self.conversation = ConversationChain(prompt=self.prompt, llm=self.llm)
 
 
-def player_agent(objective: str, history: List[Dict[str, str]], completed_tasks, max_history: int = 30) -> str:
+    def run(task_storage: SingleTaskListStorage) -> SingleTaskListStorage:
+        """
+        Creates a list of game tasks to complete based game history
+        
+        Args:
+            task_storage (SingleTaskListStorage): The current task list
+
+        Returns:
+            SingleTaskListStorage: A list of tasks to be completed to beat the game
+
+        """
+        task_names = task_storage.get_task_names()
+        bullet_string = '\n'
+        response = self.conversation.predict(tasks=bullet_string + bullet_string.join(task_names))
+        if not response:
+            # Received empty response from priotritization agent. Keeping task list unchanged.
+            return task_storage
+
+        new_tasks = openai_task_response_to_list(response)
+        return SingleTaskListStorage(new_tasks)
+
+
+class PlayerAgent(ConversationAgent):
     """
-    Executes a task based on the given objective and previous game history
-
-    Args:
-        objective (str): The objective or goal for the AI to perform the task.
-        history (list): What game inputs/outputs have been received. In the
-            form of OpenAI Conversation Prompt
-
-    Returns:
-        str: The response generated by the AI for the given task.
-
+    Agent that executes a task based on the given objective and previous game history
     """
 
-    prompt = """
+    def __init(self):
+        super()
+        self.prompt = ChatPromptTemplate.from_messages([
+            SystemMessagePromptTemplate.from_template("""
 You are playing the 1977 classic Colossal Cave. 
 
 If you ask the same question in a loop, use the "help" command to get out of the loop. Don't get frustrated and only take one item at a time.
 
 The games text parser is limited, keep your commands to one action and 1-3 words. Enter a single command for each prompt. Use the following guide to beat the game. Look around and e what is visible. if your objective is invisible, keep moving. You can only move north, south, east, and west.
 
-"""
-    prompt += f"Choose the next game input based on the following objective: {objective}\n"
-    prompt += f"\nThe following objectives have been completed\n{completed_tasks}\n\n"
-    prompt += 'Take into account these previously completed tasks in the chat history'
-    first_history_index = 0 if len(history) <= max_history else -1 * max_history
-    messages = prompt_to_history(prompt) + history[first_history_index:]
-    return openai_call(messages, max_tokens=2000)
+Choose the next game input based on the following objective: {objective}
+
+The following objectives have been completed:
+
+{completed_tasks}
+
+Take into account these previously completed tasks in the chat history
+"""),
+            MessagPlaceholder(variable_name="history"),
+            HumanMessagePromptTemplate.from_template("{message}")
+        ])
+        self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
 
 
-# Decide if task has been completed
-def task_completion_agent(objective: str, history: List[Dict[str, str]], max_history: int = 10) -> str:
+    def run(objective: str, message: str, completed_tasks: SingleTaskListStorage) -> SingleTaskListStorage:
+        """
+        Creates a list of game tasks to complete based game history
+        
+        Args:
+            objective (str): next game taks
+            message (str): next game output
+            completed_tasks (SingleTaskListStorage): list of completed tasks
+
+        Returns:
+            str: the next game input
+
+        """
+        task_names = completed_tasks.get_task_names()
+        bullet_string = '\n'
+        return self.conversation.predict(objective=objective, message=message, completed_tasks=task_names)
+
+
+class TaskCompletionAgent(ConversationAgent):
     """
-    Executes a task based on the given objective and previous context.
-
-    Args:
-        objective (str): The objective or goal for the AI to perform the task.
-        task (str): The task to be executed by the AI.
-
-    Returns:
-        str: The response generated by the AI for the given task.
-
+    Agent that decides if the current objective has been completed
     """
 
-    prompt = "You are playing the 1977 classic Colossal Cave.\n"
+    def __init(self):
+        super()
+        self.prompt = ChatPromptTemplate.from_messages([
+            SystemMessagePromptTemplate.from_template("""
+You are playing the 1977 classic Colossal Cave. 
 
-    prompt += f"Decide if the currnent objective has been completed. \n\n Objective: {objective}\n"
-    prompt += 'Take into account these previously completed tasks in the chat history'
-    prompt += f'Reply with a simple "COMPLETE" or "INCOMPLETE". Conversation history is below:\n'
-    first_history_index = 0 if len(history) <= max_history else -1 * max_history
-    messages = prompt_to_history(prompt) + history[first_history_index:]
-    return openai_call(messages, max_tokens=2000).lower() == "complete"
+Decide if the current objective has been completed.
 
+Objective: {objective}
+
+Take into account these previously completed tasks in the chat history
+
+Reply with a simple "COMPLETE" or "INCOMPLETE".
+"""),
+            MessagPlaceholder(variable_name="history"),
+            HumanMessagePromptTemplate.from_template("{message}")
+        ])
+        self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
+
+
+    def run(objective: str, message: str) -> SingleTaskListStorage:
+        """
+        Creates a list of game tasks to complete based game history
+        
+        Args:
+            objective (str): current game objective
+            message (str): next game input
+
+        Returns:
+            bool: whether the task is complete or not
+
+        """
+        return self.conversation.predict(objective=objective, message=message).lower() == "complete"
