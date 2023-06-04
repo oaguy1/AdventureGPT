@@ -33,12 +33,15 @@ import os
 import re
 import time
 
-from langchain.chains import ConversationChain
+from langchain.chains import ConversationChain, LLMChain
 from langchain.chat_models import ChatOpenAI
+from langchain.llms import OpenAI
 from langchain.memory import ConversationBufferMemory
+from langchain.prompts import PromptTemplate
 from langchain.prompts.chat import (
     ChatPromptTemplate,
-    MessagPlaceholder,
+    ChatPromptTemplate,
+    MessagesPlaceholder,
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
 )
@@ -130,8 +133,8 @@ class GameTaskCreationAgent(ConversationAgent):
     Agent that creates a list of game tasks to complete based game history
     """
 
-    def __init(self):
-        super()
+    def __init__(self):
+        super().__init__()
         self.prompt = ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template("""
 You are an agent tasked with creating a list of tasks in order win the text based adventure game Colossal Cave Adventure.
@@ -149,10 +152,12 @@ Return one task per line in your response. The result must be a numbered list in
 #. Second task
 
 The number of each entry must be followed by a period.
+
 Unless your list is empty, do not include any headers before your numbered list or follow your numbered list with any other output.
 
+Take into account the game history attached here: {history}
 """),
-            MessagPlaceholder(variable_name="history"),
+            MessagesPlaceholder(variable_name="history"),
             HumanMessagePromptTemplate.from_template("{input}")
         ])
         self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
@@ -174,14 +179,16 @@ Unless your list is empty, do not include any headers before your numbered list 
         return SingleTaskListStorage(task_list)
 
 
-class WalkthroughGameTaskCreationAgent(ConversationAgent):
+class WalkthroughGameTaskCreationAgent:
     """
     Agent that creates a list of game tasks to complete based on a given walthrough.
     """
 
     def __init__(self):
-        self.prompt = ChatPromptTemplate.from_messages([
-            SystemMessagePromptTemplate.from_template("""
+        self.llm = OpenAI(temperture=OPENAI_TEMPERATURE)
+        self.prompt = PromptTemplate(
+                input_variables=["walkthrough"],
+                template="""
 You are an agent tasked with creating a list of tasks in order win the text based adventure game Colossal Cave Adventure.
 
 Please utilize the following walkthrough to win the game:
@@ -195,9 +202,8 @@ Return one task per line in your response. The result must be a numbered list in
 
 The number of each entry must be followed by a period.
 Unless your list is empty, do not include any headers before your numbered list or follow your numbered list with any other output.
-"""),
-        ])
-        self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
+""")
+        self.chain = LLMChain(prompt=self.prompt, llm=self.llm)
 
 
     def run(walkthrough: str) -> SingleTaskListStorage:
@@ -211,22 +217,25 @@ Unless your list is empty, do not include any headers before your numbered list 
             SingleTaskListStorage: A list of tasks to be completed to beat the game
 
         """
-        response = self.conversation.predict(walkthrough=walkthrough)
+        response = self.chain.run(walkthrough=walkthrough)
         task_list = openai_task_response_to_list(response)
         return SingleTaskListStorage(task_list)
 
 
-class PrioritizationAgent(ConversationAgent):
+class PrioritizationAgent:
     """
     Agent that given a SingleTaskListStorage prioritizes the task list to be more effective
     """
 
-    def __init(self):
-        super()
-        self.prompt = ChatPromptTemplate.from_messages([
-            SystemMessagePromptTemplate.from_template("""
+    def __init__(self):
+        self.llm = OpenAI(temperture=OPENAI_TEMPERATURE)
+        self.prompt = PromptTemplate(
+                input_variables=["tasks"],
+                template="""
 You are tasked with prioritizing a task list
+
 Consider the ultimate objective of winning the game.
+
 Tasks should be sorted from highest to lowest priority, where higher-priority tasks are those that act as pre-requisites or are more essential for meeting the objective.
 Do not remove any tasks. Return the ranked tasks as a numbered list in the format:
 
@@ -234,10 +243,11 @@ Do not remove any tasks. Return the ranked tasks as a numbered list in the forma
 #. Second task
 
 The entries must be consecutively numbered, starting with 1. The number of each entry must be followed by a period.
-Do not include any headers before your ranked list or follow your list with any other output."""),
-            HumanMessagePromptTemplate.from_template("This is the task list: {tasks}")
-        ])
-        self.conversation = ConversationChain(prompt=self.prompt, llm=self.llm)
+Do not include any headers before your ranked list or follow your list with any other output.
+
+These are the tasks : {tasks}
+""")
+        self.chain = LLMChain(prompt=self.prompt, llm=self.llm)
 
 
     def run(task_storage: SingleTaskListStorage) -> SingleTaskListStorage:
@@ -253,7 +263,7 @@ Do not include any headers before your ranked list or follow your list with any 
         """
         task_names = task_storage.get_task_names()
         bullet_string = '\n'
-        response = self.conversation.predict(tasks=bullet_string + bullet_string.join(task_names))
+        response = self.chain.run(tasks=bullet_string + bullet_string.join(task_names))
         if not response:
             # Received empty response from priotritization agent. Keeping task list unchanged.
             return task_storage
@@ -267,10 +277,11 @@ class PlayerAgent(ConversationAgent):
     Agent that executes a task based on the given objective and previous game history
     """
 
-    def __init(self):
-        super()
-        self.prompt = ChatPromptTemplate.from_messages([
-            SystemMessagePromptTemplate.from_template("""
+    def __init__(self):
+        super().__init__()
+        self.prompt = PromptTemplate(
+                input_variables=["completed_tasks", "history", "input", "objective"],
+                template="""
 You are playing the 1977 classic Colossal Cave. 
 
 If you ask the same question in a loop, use the "help" command to get out of the loop. Don't get frustrated and only take one item at a time.
@@ -283,11 +294,10 @@ The following objectives have been completed:
 
 {completed_tasks}
 
-Take into account these previously completed tasks in the chat history
-"""),
-            MessagPlaceholder(variable_name="history"),
-            HumanMessagePromptTemplate.from_template("{message}")
-        ])
+Current conversation:
+{history}
+Human: {input}
+AI:""")
         self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
 
 
@@ -306,7 +316,7 @@ Take into account these previously completed tasks in the chat history
         """
         task_names = completed_tasks.get_task_names()
         bullet_string = '\n'
-        return self.conversation.predict(objective=objective, message=message, completed_tasks=task_names)
+        return self.conversation.predict(input=message, objective=objective, completed_tasks=task_names)
 
 
 class TaskCompletionAgent(ConversationAgent):
@@ -314,8 +324,8 @@ class TaskCompletionAgent(ConversationAgent):
     Agent that decides if the current objective has been completed
     """
 
-    def __init(self):
-        super()
+    def __init__(self):
+        super().__init__()
         self.prompt = ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template("""
 You are playing the 1977 classic Colossal Cave. 
@@ -324,12 +334,12 @@ Decide if the current objective has been completed.
 
 Objective: {objective}
 
-Take into account these previously completed tasks in the chat history
+Take into account the game history attached here: {history}
 
 Reply with a simple "COMPLETE" or "INCOMPLETE".
 """),
-            MessagPlaceholder(variable_name="history"),
-            HumanMessagePromptTemplate.from_template("{message}")
+            MessagesPlaceholder(variable_name="history"),
+            HumanMessagePromptTemplate.from_template("{input}")
         ])
         self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
 

@@ -19,8 +19,8 @@ from adventure import load_advent_dat
 from adventure.game import Game
 
 from adventuregpt.agent import (
-        GametaskCreationAgent,
-        WalkthroughGametaskCreationAgent,
+        GameTaskCreationAgent,
+        WalkthroughGameTaskCreationAgent,
         PrioritizationAgent,
         PlayerAgent,
         TaskCompletionAgent,
@@ -44,8 +44,8 @@ class Loop():
         self.walkthrough_path = walkthrough_path
         self.output_file_path = output_file_path
         self.current_task = None
-        self.game_task_creation_agent = GametaskCreationAgent()
-        self.walkthrough_game_task_creation_agent = WalkthroughGametaskCreationAgent()
+        self.game_task_creation_agent = GameTaskCreationAgent()
+        self.walkthrough_game_task_creation_agent = WalkthroughGameTaskCreationAgent()
         self.prioritization_agent = PrioritizationAgent()
         self.player_agent = PlayerAgent()
         self.task_creation_agent = TaskCompletionAgent()
