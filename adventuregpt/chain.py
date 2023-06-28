@@ -1,5 +1,5 @@
 """
-OpenAI based agents for interactiving in the game world
+LangChain LLMChains to process game i/o
 
 Copyright (c) 2023 Lily Hughes-Robinson.
 
@@ -31,8 +31,8 @@ SOFTWARE.
 
 import os
 import re
-import time
 
+from collections import deque
 from langchain.chains import ConversationChain, LLMChain
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
@@ -45,17 +45,10 @@ from langchain.prompts.chat import (
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
 )
-from langchain.schema import (
-    AIMessage,
-    HumanMessage,
-    SystemMessage
-)
-from typing import Dict, List, Union
-from collections import deque
+from pydantic import root_validator
+from typing import Dict, List, Tuple
 
 
-LLM_MODEL = "gpt-3.5-turbo"
-MAX_LLM_TOKEN = 4096
 OPENAI_TEMPERATURE = 0.0
 
 
@@ -124,7 +117,7 @@ class ConversationAgent:
     """
 
     def __init__(self):
-        self.llm = ChatOpenAI(temperture=OPENAI_TEMPERATURE)
+        self.llm = ChatOpenAI(temperature=OPENAI_TEMPERATURE)
         self.memory = ConversationBufferMemory(return_messages=True)
 
 
@@ -163,7 +156,7 @@ Take into account the game history attached here: {history}
         self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
 
 
-    def run(message: str) -> SingleTaskListStorage:
+    def run(self, message: str) -> SingleTaskListStorage:
         """
         Creates a list of game tasks to complete based game history
         
@@ -185,7 +178,7 @@ class WalkthroughGameTaskCreationAgent:
     """
 
     def __init__(self):
-        self.llm = OpenAI(temperture=OPENAI_TEMPERATURE)
+        self.llm = OpenAI(temperature=OPENAI_TEMPERATURE)
         self.prompt = PromptTemplate(
                 input_variables=["walkthrough"],
                 template="""
@@ -206,7 +199,7 @@ Unless your list is empty, do not include any headers before your numbered list 
         self.chain = LLMChain(prompt=self.prompt, llm=self.llm)
 
 
-    def run(walkthrough: str) -> SingleTaskListStorage:
+    def run(self, walkthrough: str) -> SingleTaskListStorage:
         """
         Creates a list of game tasks to complete based game history
         
@@ -228,7 +221,7 @@ class PrioritizationAgent:
     """
 
     def __init__(self):
-        self.llm = OpenAI(temperture=OPENAI_TEMPERATURE)
+        self.llm = OpenAI(temperature=OPENAI_TEMPERATURE)
         self.prompt = PromptTemplate(
                 input_variables=["tasks"],
                 template="""
@@ -250,7 +243,7 @@ These are the tasks : {tasks}
         self.chain = LLMChain(prompt=self.prompt, llm=self.llm)
 
 
-    def run(task_storage: SingleTaskListStorage) -> SingleTaskListStorage:
+    def run(self, task_storage: SingleTaskListStorage) -> SingleTaskListStorage:
         """
         Creates a list of game tasks to complete based game history
         
@@ -272,6 +265,18 @@ These are the tasks : {tasks}
         return SingleTaskListStorage(new_tasks)
 
 
+class CustomConversationChain(ConversationChain):
+    """
+    Custom ConversationChain with more variables, removes validation
+    """
+    
+    @root_validator
+    def validate_prompt_input_variables(cls, values: Dict) -> Dict:
+        """
+        don't perform the validation, just pass the values
+        """
+        return values
+
 class PlayerAgent(ConversationAgent):
     """
     Agent that executes a task based on the given objective and previous game history
@@ -279,6 +284,7 @@ class PlayerAgent(ConversationAgent):
 
     def __init__(self):
         super().__init__()
+        self.memory.input_key = "input"
         self.prompt = PromptTemplate(
                 input_variables=["completed_tasks", "history", "input", "objective"],
                 template="""
@@ -298,10 +304,10 @@ Current conversation:
 {history}
 Human: {input}
 AI:""")
-        self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
+        self.conversation = CustomConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
 
 
-    def run(objective: str, message: str, completed_tasks: SingleTaskListStorage) -> SingleTaskListStorage:
+    def run(self, objective: str, message: str, completed_tasks: SingleTaskListStorage) -> SingleTaskListStorage:
         """
         Creates a list of game tasks to complete based game history
         
@@ -326,6 +332,7 @@ class TaskCompletionAgent(ConversationAgent):
 
     def __init__(self):
         super().__init__()
+        self.memory.input_key = "input"
         self.prompt = ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template("""
 You are playing the 1977 classic Colossal Cave. 
@@ -341,10 +348,10 @@ Reply with a simple "COMPLETE" or "INCOMPLETE".
             MessagesPlaceholder(variable_name="history"),
             HumanMessagePromptTemplate.from_template("{input}")
         ])
-        self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
+        self.conversation = CustomConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
 
 
-    def run(objective: str, message: str) -> SingleTaskListStorage:
+    def run(self, objective: str, message: str) -> SingleTaskListStorage:
         """
         Creates a list of game tasks to complete based game history
         
@@ -356,4 +363,4 @@ Reply with a simple "COMPLETE" or "INCOMPLETE".
             bool: whether the task is complete or not
 
         """
-        return self.conversation.predict(objective=objective, message=message).lower() == "complete"
+        return self.conversation.predict(objective=objective, input=message).lower() == "complete"
