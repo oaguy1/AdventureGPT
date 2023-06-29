@@ -16,15 +16,16 @@ from time import sleep
 
 from adventure import load_advent_dat
 from adventure.game import Game
+from langchain.text_splitter import CharacterTextSplitter
 
 from adventuregpt.chain import (
         GameTaskCreationAgent,
         WalkthroughGameTaskCreationAgent,
         PrioritizationAgent,
         PlayerAgent,
-        TaskCompletionAgent,
-        SingleTaskListStorage
+        TaskCompletionAgent
     )
+from adventuregpt.collections import SingleTaskListStorage
 
 
 BAUD = 1200
@@ -124,25 +125,21 @@ class Loop():
         # and pass to walkthrough gametask agent, else use gametask_creation_agent
         # with the limited history
         if self.walkthrough_path:
-            text_chunks = []
-            chunk_size = 500
+            chunk_size = 300
+            chunk_overlap = 10
             
             with open(self.walkthrough_path, 'r') as f:
-                curr_chunk = []
-                for line in f:
-                    tokens = line.split()
-                    curr_chunk += tokens
-
-                    if len(curr_chunk) >= chunk_size:
-                        text_chunks.append(" ".join(curr_chunk))
-                        curr_chunk = []
-
+                walkthrough = f.read()
+                text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
+                    chunk_size=chunk_size, chunk_overlap=chunk_overlap
+                )
+                text_chunks = text_splitter.split_text(walkthrough)
 
             for chunk in text_chunks:
                 tasks = self.walkthrough_game_task_creation_agent.run(chunk)
                 self.game_tasks.concat(tasks)
         else:
-            self.game_tasks = self.game_task_creation_agent.run(self.history)
+            self.game_tasks = self.game_task_creation_agent.run(self.player_agent.memory, self.curr_game_output)
 
         self.next_game_task()
         self.baudout(self.curr_game_output)
@@ -173,10 +170,11 @@ class Loop():
 
                     # if not using a walthrough, come up with more tasks and prioritize
                     if not self.walkthrough_path:
-                        new_tasks = self.gametask_creation_agent.run(self.curr_game_output)
-                        self.game_tasks.concat(new_tasks)
-                        self.game_tasks = self.prioritization_agent.run(self.game_tasks, self.curr_game_output)
+                        new_tasks = self.game_task_creation_agent.run(self.player_agent.memory, self.curr_game_output)
+                        curr_tasks = self.game_tasks
+                        self.game_tasks = SingleTaskListStorage.concat(curr_tasks, new_tasks)
+                        self.game_tasks = self.prioritization_agent.run(self.game_tasks)
                     
-                    completed = self.task_completion_agent.run(self.current_task, self.curr_game_output)
+                    completed = self.task_completion_agent.run(self.current_task, self.player_agent.memory, self.curr_game_output)
                     if completed:
                         self.next_game_task()
