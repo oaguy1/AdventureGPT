@@ -1,9 +1,7 @@
 # AdventureGPT
 
 An set of autonomous agents designed to play the 1977 game
-ADVENTURE or [Colossal Cave Adventure](https://en.m.wikipedia.org/wiki/Colossal_Cave_Adventure). Currently utilizing OpenAI
-python SDK,the eventual goal is to switch to LangChain.
-The code base here is based off code from the following repos:
+ADVENTURE or [Colossal Cave Adventure](https://en.m.wikipedia.org/wiki/Colossal_Cave_Adventure). The code base here is based off code from the following repos:
 
 * [python-adventure](https://github.com/brandon-rhodes/python-adventure)
 * [BabyAGI](https://github.com/yoheinakajima/babyagi)
@@ -26,7 +24,6 @@ Add a `--help` flag to see the command line arguments.
 
 Here is a list of eventual goals for the project:
 
-* Switch to LangChain
 * Add map/location agent
 * Win the game
 * Add a curses style UI for displaying tasks and prompts while showing gameplay in its own pane
