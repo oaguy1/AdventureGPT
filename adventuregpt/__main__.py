@@ -17,10 +17,11 @@ if __name__ == '__main__':
     )
     parser.add_argument("-w", "--walkthrough_path")
     parser.add_argument("-o", "--output_path")
+    parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
     try:
-        game_loop = Loop(args.walkthrough_path, args.output_path)
+        game_loop = Loop(args.walkthrough_path, args.output_path, args.verbose)
         game_loop.loop()
     except EOFError:
         pass

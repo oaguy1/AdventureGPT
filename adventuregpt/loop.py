@@ -36,13 +36,14 @@ class Loop():
     game is won or an exception is thrown
     """
 
-    def __init__(self, walkthrough_path: str = "", output_file_path: str = "game_output.txt"):
+    def __init__(self, walkthrough_path: str = "", output_file_path: str = "game_output.txt", verbose: bool = False):
         self.history = []
         self.game_tasks = SingleTaskListStorage()
         self.completed_tasks = SingleTaskListStorage()
         self.walkthrough_path = walkthrough_path
         self.output_file_path = output_file_path
         self.current_task = None
+        self.verbose = verbose
         
         self.game = Game()
         load_advent_dat(self.game)
@@ -112,11 +113,11 @@ class Loop():
         Main Game Loop
         """
         # initialize agents 
-        self.game_task_creation_agent = GameTaskCreationAgent()
-        self.walkthrough_game_task_creation_agent = WalkthroughGameTaskCreationAgent()
-        self.prioritization_agent = PrioritizationAgent()
-        self.player_agent = PlayerAgent()
-        self.task_completion_agent = TaskCompletionAgent()
+        self.game_task_creation_agent = GameTaskCreationAgent(self.verbose)
+        self.walkthrough_game_task_creation_agent = WalkthroughGameTaskCreationAgent(self.verbose)
+        self.prioritization_agent = PrioritizationAgent(self.verbose)
+        self.player_agent = PlayerAgent(self.verbose)
+        self.task_completion_agent = TaskCompletionAgent(self.verbose)
         
         print("***************** INITIALIZING GAME *******************") 
         # if usng walkthrough, read into memory in chunks of 500ish tokens

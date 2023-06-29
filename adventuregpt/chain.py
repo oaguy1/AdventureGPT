@@ -126,7 +126,7 @@ class GameTaskCreationAgent(ConversationAgent):
     Agent that creates a list of game tasks to complete based game history
     """
 
-    def __init__(self):
+    def __init__(self, verbose: bool = False):
         super().__init__()
         self.prompt = ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template("""
@@ -153,7 +153,7 @@ Take into account the game history attached here: {history}
             MessagesPlaceholder(variable_name="history"),
             HumanMessagePromptTemplate.from_template("{input}")
         ])
-        self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
+        self.conversation = ConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm, verbose=verbose)
 
 
     def run(self, message: str) -> SingleTaskListStorage:
@@ -177,7 +177,7 @@ class WalkthroughGameTaskCreationAgent:
     Agent that creates a list of game tasks to complete based on a given walthrough.
     """
 
-    def __init__(self):
+    def __init__(self, verbose: bool = False):
         self.llm = OpenAI(temperature=OPENAI_TEMPERATURE)
         self.prompt = PromptTemplate(
                 input_variables=["walkthrough"],
@@ -196,7 +196,7 @@ Return one task per line in your response. The result must be a numbered list in
 The number of each entry must be followed by a period.
 Unless your list is empty, do not include any headers before your numbered list or follow your numbered list with any other output.
 """)
-        self.chain = LLMChain(prompt=self.prompt, llm=self.llm)
+        self.chain = LLMChain(prompt=self.prompt, llm=self.llm, verbose=verbose)
 
 
     def run(self, walkthrough: str) -> SingleTaskListStorage:
@@ -220,7 +220,7 @@ class PrioritizationAgent:
     Agent that given a SingleTaskListStorage prioritizes the task list to be more effective
     """
 
-    def __init__(self):
+    def __init__(self, verbose: bool = False):
         self.llm = OpenAI(temperature=OPENAI_TEMPERATURE)
         self.prompt = PromptTemplate(
                 input_variables=["tasks"],
@@ -240,7 +240,7 @@ Do not include any headers before your ranked list or follow your list with any 
 
 These are the tasks : {tasks}
 """)
-        self.chain = LLMChain(prompt=self.prompt, llm=self.llm)
+        self.chain = LLMChain(prompt=self.prompt, llm=self.llm, verbose=verbose)
 
 
     def run(self, task_storage: SingleTaskListStorage) -> SingleTaskListStorage:
@@ -282,7 +282,7 @@ class PlayerAgent(ConversationAgent):
     Agent that executes a task based on the given objective and previous game history
     """
 
-    def __init__(self):
+    def __init__(self, verbose: bool = False):
         super().__init__()
         self.memory.input_key = "input"
         self.prompt = PromptTemplate(
@@ -304,7 +304,7 @@ Current conversation:
 {history}
 Human: {input}
 AI:""")
-        self.conversation = CustomConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
+        self.conversation = CustomConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm, verbose=verbose)
 
 
     def run(self, objective: str, message: str, completed_tasks: SingleTaskListStorage) -> SingleTaskListStorage:
@@ -330,7 +330,7 @@ class TaskCompletionAgent(ConversationAgent):
     Agent that decides if the current objective has been completed
     """
 
-    def __init__(self):
+    def __init__(self, verbose: bool = False):
         super().__init__()
         self.memory.input_key = "input"
         self.prompt = ChatPromptTemplate.from_messages([
@@ -348,7 +348,7 @@ Reply with a simple "COMPLETE" or "INCOMPLETE".
             MessagesPlaceholder(variable_name="history"),
             HumanMessagePromptTemplate.from_template("{input}")
         ])
-        self.conversation = CustomConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm)
+        self.conversation = CustomConversationChain(memory=self.memory, prompt=self.prompt, llm=self.llm, verbose=verbose)
 
 
     def run(self, objective: str, message: str) -> SingleTaskListStorage:
